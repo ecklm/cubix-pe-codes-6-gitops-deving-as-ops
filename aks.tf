@@ -23,6 +23,9 @@ resource "azurerm_kubernetes_cluster" "this" {
   dns_prefix          = "${local.project_name}-${local.environment}"
   node_resource_group = "${azurerm_resource_group.this.name}-nodes"
 
+  oidc_issuer_enabled       = true
+  workload_identity_enabled = true
+
   node_provisioning_profile {
     mode = "Manual"
   }
@@ -31,6 +34,12 @@ resource "azurerm_kubernetes_cluster" "this" {
     name       = "system"
     node_count = 1
     vm_size    = "Standard_D2as_v5"
+
+    upgrade_settings {
+      drain_timeout_in_minutes      = 0
+      max_surge                     = "10%"
+      node_soak_duration_in_minutes = 0
+    }
   }
 
   identity {
@@ -52,4 +61,10 @@ resource "azurerm_role_assignment" "kube_admin" {
   scope                = resource.azurerm_kubernetes_cluster.this.id
   role_definition_name = "Azure Kubernetes Service RBAC Cluster Admin"
   principal_id         = each.key
+}
+
+resource "time_sleep" "wait_for_kube_admin" {
+  depends_on = [azurerm_role_assignment.kube_admin]
+
+  create_duration = "60s"
 }

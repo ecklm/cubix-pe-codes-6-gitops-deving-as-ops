@@ -29,4 +29,6 @@ resource "helm_release" "traefik" {
 
   atomic          = true
   cleanup_on_fail = true
+
+  depends_on = [time_sleep.wait_for_kube_admin]
 }
