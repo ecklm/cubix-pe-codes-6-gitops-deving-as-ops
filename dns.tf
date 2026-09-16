@@ -1,6 +1,13 @@
 locals {
-  project_domain   = "${local.project_name}.${local.environment}.${var.parent_domain}"
+  project_domain = "${local.project_name}.${local.environment}.${var.parent_domain}"
+
   dns_txt_owner_id = replace(local.project_domain, ".", "-")
+  external_dns_azure_json = jsonencode({
+    tenantId                     = data.azurerm_client_config.current.tenant_id
+    subscriptionId               = data.azurerm_client_config.current.subscription_id
+    resourceGroup                = azurerm_resource_group.dns.name
+    useWorkloadIdentityExtension = true
+  })
 }
 
 resource "azurerm_resource_group" "dns" {
@@ -45,49 +52,67 @@ resource "helm_release" "external_dns" {
   provider = helm.sbx
 
   name             = "external-dns"
-  repository       = "https://kubernetes-sigs.github.io/external-dns/"
-  chart            = "external-dns"
-  version          = "1.20.0"
+  repository       = "https://bedag.github.io/helm-charts"
+  chart            = "raw"
+  version          = "2.0.2"
   namespace        = "external-dns"
   create_namespace = true
 
   values = [
-    yamlencode({
-      logFormat = "text"
-      podLabels = {
-        "azure.workload.identity/use" = "true"
-      }
-      sources = ["ingress"]
-      provider = {
-        name = "azure"
-      }
-      policy             = "sync"
-      registry           = "txt"
-      triggerLoopOnEvent = true
-      txtOwnerId         = local.dns_txt_owner_id
-      domainFilters      = [local.project_domain]
-      serviceAccount = {
-        labels = {
-          "azure.workload.identity/use" = "true"
-        }
-        annotations = {
-          "azure.workload.identity/client-id" = azurerm_user_assigned_identity.external_dns.client_id
-        }
-      }
-      secretConfiguration = {
-        enabled = true
-        data = {
-          "azure.json" = jsonencode({
-            tenantId                     = data.azurerm_client_config.current.tenant_id
-            subscriptionId               = data.azurerm_client_config.current.subscription_id
-            resourceGroup                = azurerm_resource_group.dns.name
-            useWorkloadIdentityExtension = true
-          })
-        }
-        mountPath = "/etc/kubernetes"
-      }
-      extraArgs = ["--azure-resource-group=${azurerm_resource_group.dns.name}"]
-    })
+    <<-EOT
+    ---
+    resources:
+      - apiVersion: argoproj.io/v1alpha1
+        kind: Application
+        metadata:
+          name: external-dns
+          namespace: argocd
+          finalizers:
+            - resources-finalizer.argocd.argoproj.io
+        spec:
+          destination:
+            namespace: external-dns
+            server: https://kubernetes.default.svc
+          project: platform
+          syncPolicy:
+            syncOptions:
+            - CreateNamespace=true
+            automated:
+              enabled: true
+              selfHeal: true
+              prune: true
+          source:
+            chart: external-dns
+            repoURL: https://kubernetes-sigs.github.io/external-dns/
+            targetRevision: 1.20.0
+            helm:
+              valuesObject:
+                logFormat: text
+                podLabels:
+                  azure.workload.identity/use: "true"
+                sources:
+                  - ingress
+                provider:
+                  name: azure
+                policy: sync
+                registry: txt
+                triggerLoopOnEvent: true
+                txtOwnerId: ${local.dns_txt_owner_id}
+                domainFilters:
+                  - ${local.project_domain}
+                serviceAccount:
+                  labels:
+                    azure.workload.identity/use: "true"
+                  annotations:
+                    azure.workload.identity/client-id: ${azurerm_user_assigned_identity.external_dns.client_id}
+                secretConfiguration:
+                  enabled: true
+                  data:
+                    azure.json: '${local.external_dns_azure_json}'
+                  mountPath: /etc/kubernetes
+                extraArgs:
+                  - --azure-resource-group=${azurerm_resource_group.dns.name}
+    EOT
   ]
 
   atomic          = true
@@ -97,5 +122,7 @@ resource "helm_release" "external_dns" {
     azurerm_federated_identity_credential.external_dns,
     azurerm_role_assignment.external_dns_zone_contributor,
     time_sleep.wait_for_kube_admin,
+    helm_release.argocd,
+    helm_release.argocd-projects
   ]
 }

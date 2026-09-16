@@ -3,12 +3,6 @@ data "azurerm_client_config" "current" {}
 locals {
   project_name = "project-x"
   environment  = "sbx"
-  aks_admins = toset([
-    # Whoever is running (pipeline?). Will flap, though.
-    data.azurerm_client_config.current.object_id,
-    # Your personal user ID: az ad signed-in-user show --query id -o tsv
-    "1263d89e-4b6d-44cf-9149-75c19a3412e5",
-  ])
 }
 
 resource "azurerm_resource_group" "this" {
@@ -54,17 +48,24 @@ resource "azurerm_kubernetes_cluster" "this" {
   }
   local_account_disabled = true
 }
-
 resource "azurerm_role_assignment" "kube_admin" {
-  for_each = local.aks_admins
-
   scope                = resource.azurerm_kubernetes_cluster.this.id
   role_definition_name = "Azure Kubernetes Service RBAC Cluster Admin"
-  principal_id         = each.key
+  principal_id         = azuread_group.platform_admins.object_id
 }
 
 resource "time_sleep" "wait_for_kube_admin" {
   depends_on = [azurerm_role_assignment.kube_admin]
 
   create_duration = "60s"
+}
+
+resource "local_file" "aks_kubeconfig" {
+  filename = "${path.module}/kubeconfig-${local.environment}.yaml"
+  content = templatefile("${path.module}/templates/kubeconfig.tpl", {
+    cluster_name               = azurerm_kubernetes_cluster.this.name
+    server                     = azurerm_kubernetes_cluster.this.kube_config[0].host
+    certificate_authority_data = azurerm_kubernetes_cluster.this.kube_config[0].cluster_ca_certificate
+  })
+  file_permission = "0600"
 }
