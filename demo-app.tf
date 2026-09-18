@@ -37,7 +37,7 @@ resource "helm_release" "demo-app" {
             helm:
               valuesObject:
                 ingress:
-                  host: colors.project-x.sbx.ecklm.cubix.ecklm.com
+                  host: colors.${local.project_domain}
                   annotations:
                     cert-manager.io/cluster-issuer: letsencrypt
     EOT

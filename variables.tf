@@ -7,7 +7,7 @@ variable "location" {
 variable "parent_domain" {
   description = "Parent DNS domain used to derive the project zone."
   type        = string
-  default     = "ecklm.cubix.ecklm.com"
+  default     = "ecklm.az.cubix-pe.hu"
 }
 
 variable "parent_domain_resource_group_name" {
