@@ -28,13 +28,13 @@ resource "helm_release" "cert_manager" {
             - group: admissionregistration.k8s.io
               kind: ValidatingWebhookConfiguration
               name: cert-manager-webhook
-              jqPathExpressions:
-                - '.webhooks[]?.namespaceSelector.matchExpressions[] | select(.key == "control-plane" or .key == "kubernetes.azure.com/managedby")'
+              jsonPointers:
+                - /webhooks/0/namespaceSelector/matchExpressions
             - group: admissionregistration.k8s.io
               kind: MutatingWebhookConfiguration
               name: cert-manager-webhook
-              jqPathExpressions:
-                - '.webhooks[]?.namespaceSelector.matchExpressions[] | select(.key == "control-plane" or .key == "kubernetes.azure.com/managedby")'
+              jsonPointers:
+                - /webhooks/0/namespaceSelector/matchExpressions
           syncPolicy:
             syncOptions:
             - CreateNamespace=true
@@ -111,7 +111,7 @@ resource "helm_release" "letsencrypt_cluster_issuer" {
                       name: letsencrypt
                     spec:
                       acme:
-                        email: ecklm@ecklm.com
+                        email: ecklm@cubix-pe.hu
                         server: https://acme-v02.api.letsencrypt.org/directory
                         privateKeySecretRef:
                           name: letsencrypt-account-key
