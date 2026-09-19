@@ -6,7 +6,6 @@ locals {
 }
 
 resource "helm_release" "argocd-projects" {
-  provider = helm.sbx
   for_each = local.argocd_projects # Just to avoid code duplication
 
   name       = "argocd-project-${each.key}"

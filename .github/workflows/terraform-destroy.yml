@@ -5,6 +5,18 @@ name: Terraform Destroy
   schedule:
     - cron: '0 0 * * *'
   workflow_dispatch:
+    inputs:
+      environment:
+        description: Terraform environment
+        required: true
+        default: sbx
+        type: choice
+        options:
+          - sbx
+          - dev
+
+env:
+  TF_ENVIRONMENT: ${{ inputs.environment || 'sbx' }}
 
 permissions:
   contents: read
@@ -32,5 +44,8 @@ jobs:
       - name: Terraform init
         run: terraform init -input=false
 
+      - name: Select Terraform workspace
+        run: terraform workspace select "$TF_ENVIRONMENT" || terraform workspace new "$TF_ENVIRONMENT"
+
       - name: Terraform destroy
-        run: terraform destroy -input=false -auto-approve
+        run: terraform destroy -input=false -var-file="$TF_ENVIRONMENT.tfvars" -auto-approve

@@ -7,6 +7,18 @@ name: Terraform
       - master
   pull_request:
   workflow_dispatch:
+    inputs:
+      environment:
+        description: Terraform environment
+        required: true
+        default: sbx
+        type: choice
+        options:
+          - sbx
+          - dev
+
+env:
+  TF_ENVIRONMENT: ${{ inputs.environment || 'sbx' }}
 
 permissions:
   contents: read
@@ -34,11 +46,14 @@ jobs:
       - name: Terraform init
         run: terraform init -input=false
 
+      - name: Select Terraform workspace
+        run: terraform workspace select "$TF_ENVIRONMENT" || terraform workspace new "$TF_ENVIRONMENT"
+
       - name: Terraform validate
         run: terraform validate
 
       - name: Terraform plan
-        run: terraform plan -input=false -out=tfplan
+        run: terraform plan -input=false -var-file="$TF_ENVIRONMENT.tfvars" -out=tfplan
 
       - name: Check formatting
         run: terraform fmt -check

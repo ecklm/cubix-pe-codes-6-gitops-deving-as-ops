@@ -1,5 +1,5 @@
 locals {
-  project_domain = "${local.project_name}.${local.environment}.${var.parent_domain}"
+  project_domain = "${var.project_name}.${var.env_name}.${var.parent_domain}"
 
   dns_txt_owner_id = replace(local.project_domain, ".", "-")
   external_dns_azure_json = jsonencode({
@@ -11,31 +11,31 @@ locals {
 }
 
 resource "azurerm_resource_group" "dns" {
-  name     = "${local.project_name}-${local.environment}-dns"
+  name     = "${local.resource_basename}-dns"
   location = var.location
 }
 
-resource "azurerm_dns_zone" "this" {
+resource "azurerm_dns_zone" "dns" {
   name                = local.project_domain
   resource_group_name = azurerm_resource_group.dns.name
 }
 
 resource "azurerm_dns_ns_record" "parent_delegation" {
-  name                = "${local.project_name}.${local.environment}"
+  name                = "${var.project_name}.${var.env_name}"
   zone_name           = var.parent_domain
   resource_group_name = var.parent_domain_resource_group_name
   ttl                 = 300
-  records             = azurerm_dns_zone.this.name_servers
+  records             = azurerm_dns_zone.dns.name_servers
 }
 
 resource "azurerm_user_assigned_identity" "external_dns" {
-  name                = "${local.project_name}-${local.environment}-externaldns"
-  location            = azurerm_resource_group.this.location
-  resource_group_name = azurerm_resource_group.this.name
+  name                = "${local.resource_basename}-externaldns"
+  location            = azurerm_resource_group.aks.location
+  resource_group_name = azurerm_resource_group.aks.name
 }
 
 resource "azurerm_role_assignment" "external_dns_zone_contributor" {
-  scope                = azurerm_dns_zone.this.id
+  scope                = azurerm_dns_zone.dns.id
   role_definition_name = "DNS Zone Contributor"
   principal_id         = azurerm_user_assigned_identity.external_dns.principal_id
 }
@@ -44,13 +44,11 @@ resource "azurerm_federated_identity_credential" "external_dns" {
   name                      = "external-dns"
   user_assigned_identity_id = azurerm_user_assigned_identity.external_dns.id
   audience                  = ["api://AzureADTokenExchange"]
-  issuer                    = azurerm_kubernetes_cluster.this.oidc_issuer_url
+  issuer                    = azurerm_kubernetes_cluster.aks.oidc_issuer_url
   subject                   = "system:serviceaccount:external-dns:external-dns"
 }
 
 resource "helm_release" "external_dns" {
-  provider = helm.sbx
-
   name             = "external-dns"
   repository       = "https://bedag.github.io/helm-charts"
   chart            = "raw"

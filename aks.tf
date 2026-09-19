@@ -1,21 +1,14 @@
-data "azurerm_client_config" "current" {}
-
-locals {
-  project_name = "project-x"
-  environment  = "sbx"
-}
-
-resource "azurerm_resource_group" "this" {
-  name     = "${local.project_name}-${local.environment}-aks"
+resource "azurerm_resource_group" "aks" {
+  name     = "${local.resource_basename}-aks"
   location = var.location
 }
 
-resource "azurerm_kubernetes_cluster" "this" {
-  name                = "${local.project_name}-${local.environment}"
-  resource_group_name = azurerm_resource_group.this.name
-  location            = azurerm_resource_group.this.location
-  dns_prefix          = "${local.project_name}-${local.environment}"
-  node_resource_group = "${azurerm_resource_group.this.name}-nodes"
+resource "azurerm_kubernetes_cluster" "aks" {
+  name                = local.resource_basename
+  resource_group_name = azurerm_resource_group.aks.name
+  location            = azurerm_resource_group.aks.location
+  dns_prefix          = local.resource_basename
+  node_resource_group = "${azurerm_resource_group.aks.name}-nodes"
 
   oidc_issuer_enabled       = true
   workload_identity_enabled = true
@@ -48,8 +41,9 @@ resource "azurerm_kubernetes_cluster" "this" {
   }
   local_account_disabled = true
 }
+
 resource "azurerm_role_assignment" "kube_admin" {
-  scope                = resource.azurerm_kubernetes_cluster.this.id
+  scope                = resource.azurerm_kubernetes_cluster.aks.id
   role_definition_name = "Azure Kubernetes Service RBAC Cluster Admin"
   principal_id         = azuread_group.platform_admins.object_id
 }
@@ -61,11 +55,11 @@ resource "time_sleep" "wait_for_kube_admin" {
 }
 
 resource "local_file" "aks_kubeconfig" {
-  filename = "${path.module}/kubeconfig-${local.environment}.yaml"
+  filename = "${path.module}/kubeconfig.${local.resource_basename}.yaml"
   content = templatefile("${path.module}/templates/kubeconfig.tpl", {
-    cluster_name               = azurerm_kubernetes_cluster.this.name
-    server                     = azurerm_kubernetes_cluster.this.kube_config[0].host
-    certificate_authority_data = azurerm_kubernetes_cluster.this.kube_config[0].cluster_ca_certificate
+    cluster_name               = azurerm_kubernetes_cluster.aks.name
+    server                     = azurerm_kubernetes_cluster.aks.kube_config[0].host
+    certificate_authority_data = azurerm_kubernetes_cluster.aks.kube_config[0].cluster_ca_certificate
   })
   file_permission = "0600"
 }

@@ -1,5 +1,5 @@
 locals {
-  argocd_name = "${local.project_name}-${local.environment}-argocd"
+  argocd_name = "${local.resource_basename}-argocd"
   argocd_federated_subjects = {
     argocd_server = "system:serviceaccount:argocd:argocd-server"
   }
@@ -50,15 +50,13 @@ resource "azuread_application_federated_identity_credential" "argocd" {
   application_id = azuread_application.argocd.id
   display_name   = "argocd-${each.key}"
   audiences      = ["api://AzureADTokenExchange"]
-  issuer         = azurerm_kubernetes_cluster.this.oidc_issuer_url
+  issuer         = azurerm_kubernetes_cluster.aks.oidc_issuer_url
   subject        = each.value
 
   depends_on = [azuread_service_principal.argocd]
 }
 
 resource "helm_release" "argocd" {
-  provider = helm.sbx
-
   name             = "argocd"
   repository       = "https://argoproj.github.io/argo-helm"
   chart            = "argo-cd"

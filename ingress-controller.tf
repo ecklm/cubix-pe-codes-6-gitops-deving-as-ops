@@ -1,6 +1,4 @@
 resource "helm_release" "traefik" {
-  provider = helm.sbx
-
   name             = "traefik"
   repository       = "https://bedag.github.io/helm-charts"
   chart            = "raw"

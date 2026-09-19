@@ -1,6 +1,4 @@
 resource "helm_release" "demo-app" {
-  provider = helm.sbx
-
   name       = "colors-demo-app"
   repository = "https://bedag.github.io/helm-charts"
   chart      = "raw"

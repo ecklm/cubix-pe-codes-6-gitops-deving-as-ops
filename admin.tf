@@ -8,7 +8,7 @@ locals {
 }
 
 resource "azuread_group" "platform_admins" {
-  display_name     = "${local.project_name}-${local.environment}-platform-admins"
+  display_name     = "${local.resource_basename}-platform-admins"
   security_enabled = true
 }
 

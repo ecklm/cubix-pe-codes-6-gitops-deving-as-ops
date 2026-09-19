@@ -6,7 +6,7 @@ terraform {
     use_azuread_auth     = true
     storage_account_name = "platencbecklm"
     container_name       = "tfstate"
-    key                  = "project-x-sbx.tfstate"
+    key                  = "terraform.tfstate"
   }
 
   required_providers {
@@ -14,13 +14,17 @@ terraform {
       source  = "hashicorp/azurerm"
       version = "5.3.0"
     }
+    azuread = {
+      source  = "hashicorp/azuread"
+      version = "3.9.0"
+    }
     helm = {
       source  = "hashicorp/helm"
       version = "3.2.0"
     }
-    azuread = {
-      source  = "hashicorp/azuread"
-      version = "3.9.0"
+    time = {
+      source  = "hashicorp/time"
+      version = "0.14.2"
     }
     local = {
       source  = "hashicorp/local"
@@ -40,11 +44,9 @@ provider "azuread" {
 }
 
 provider "helm" {
-  alias = "sbx"
-
   kubernetes = {
-    host                   = azurerm_kubernetes_cluster.this.kube_config[0].host
-    cluster_ca_certificate = base64decode(azurerm_kubernetes_cluster.this.kube_config[0].cluster_ca_certificate)
+    host                   = azurerm_kubernetes_cluster.aks.kube_config[0].host
+    cluster_ca_certificate = base64decode(azurerm_kubernetes_cluster.aks.kube_config[0].cluster_ca_certificate)
 
     exec = {
       api_version = "client.authentication.k8s.io/v1beta1"
